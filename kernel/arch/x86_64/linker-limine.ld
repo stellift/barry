@@ -26,6 +26,12 @@ SECTIONS
         *(.rodata .rodata.*)
     } :rodata
 
+    .init_array : {
+        KEEP(*(.init_array .init_array.*))
+        KEEP(*(.ctors))
+        KEEP(*(.preinit_array))
+    } :rodata
+
     .ktests : {
         __kernel_tests_start = .;
         KEEP(*(.ktests))
@@ -67,3 +73,6 @@ SECTIONS
         *(.dynamic)
     }
 }
+
+ASSERT(SIZEOF(.init_array) == 0,
+       "Barry forbids globals that need dynamic initialization; make them constant-initializable")

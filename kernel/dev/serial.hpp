@@ -1,5 +1,6 @@
 #pragma once
 
+#include "kernel/base/optional.hpp"
 #include "kernel/base/string_view.hpp"
 #include "kernel/base/types.hpp"
 
@@ -18,6 +19,8 @@ public:
     void write_byte(u8 byte);
     void write(StringView text);
 
+    Optional<u8> read_byte();
+
 private:
     enum class Register : u16 {
         Data = 0,
@@ -28,11 +31,13 @@ private:
         LineControl = 3,
         ModemControl = 4,
         LineStatus = 5,
+        ModemStatus = 6,
     };
 
     u8 read_register(Register) const;
     void write_register(Register, u8) const;
     bool is_transmit_buffer_empty() const;
+    bool has_received_byte() const;
     bool passes_loopback_test() const;
 
     u16 m_io_base;

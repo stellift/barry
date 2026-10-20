@@ -1,6 +1,7 @@
 #pragma once
 
 #include "kernel/base/assert.hpp"
+#include "kernel/base/traits.hpp"
 #include "kernel/base/types.hpp"
 
 namespace barry {
@@ -13,8 +14,8 @@ public:
     bool is_linked() const { return m_next != nullptr; }
 
 protected:
-    IntrusiveListNode() = default;
-    ~IntrusiveListNode() { VERIFY(!is_linked()); }
+    constexpr IntrusiveListNode() = default;
+    ~IntrusiveListNode() = default;
 
 private:
     template<typename, typename>
@@ -29,12 +30,10 @@ class IntrusiveList {
 public:
     using Node = IntrusiveListNode<T, Tag>;
 
-    IntrusiveList() { reset_sentinel(); }
+    constexpr IntrusiveList() { reset_sentinel(); }
 
     IntrusiveList(IntrusiveList const&) = delete;
     IntrusiveList& operator=(IntrusiveList const&) = delete;
-
-    ~IntrusiveList() { m_sentinel.m_next = nullptr; }
 
     bool is_empty() const { return m_sentinel.m_next == &m_sentinel; }
     usize size() const { return m_size; }
@@ -90,12 +89,12 @@ private:
     static Node* node_of(T& element) { return static_cast<Node*>(&element); }
     static T* element_of(Node* node) { return static_cast<T*>(node); }
 
-    void reset_sentinel() {
+    constexpr void reset_sentinel() {
         m_sentinel.m_next = &m_sentinel;
         m_sentinel.m_prev = &m_sentinel;
     }
 
-    void link(Node* node, Node* before, Node* after) {
+    constexpr void link(Node* node, Node* before, Node* after) {
         VERIFY(!node->is_linked());
         node->m_prev = before;
         node->m_next = after;

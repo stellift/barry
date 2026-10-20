@@ -1,5 +1,6 @@
 #include "kernel/arch/x86_64/descriptor_tables.hpp"
 
+#include "kernel/arch/x86_64/processor_local.hpp"
 #include "kernel/base/assert.hpp"
 #include "kernel/base/utility.hpp"
 
@@ -16,25 +17,27 @@ constexpr u8 FLAG_LONG_MODE = 1 << 5;
 constexpr u8 FLAG_GRANULARITY_4K = 1 << 7;
 constexpr u8 FLAG_SIZE_32BIT = 1 << 6;
 
+constexpr usize TSS_LOW_INDEX = 5;
+
 constexpr u8 privilege_bits(u8 privilege_level) {
     return static_cast<u8>((privilege_level & 0x3) << 5);
 }
 
-constexpr usize TSS_LOW_INDEX = 5;
+alignas(16) Array<u8, INTERRUPT_STACK_SIZE> g_boot_double_fault_stack { {} };
+alignas(16) Array<u8, INTERRUPT_STACK_SIZE> g_boot_non_maskable_stack { {} };
+alignas(16) Array<u8, INTERRUPT_STACK_SIZE> g_boot_debug_stack { {} };
 
-constexpr u64 DOUBLE_FAULT_STACK_SIZE = 16_KiB;
-constexpr u64 NON_MASKABLE_STACK_SIZE = 16_KiB;
-constexpr u64 DEBUG_STACK_SIZE = 16_KiB;
+Array<TaskStateSegment, MAX_PROCESSORS> g_task_states { {} };
+Array<GlobalDescriptorTable, MAX_PROCESSORS> g_descriptor_tables { {} };
 
-alignas(16) u8 g_double_fault_stack[DOUBLE_FAULT_STACK_SIZE];
-alignas(16) u8 g_non_maskable_stack[NON_MASKABLE_STACK_SIZE];
-alignas(16) u8 g_debug_stack[DEBUG_STACK_SIZE];
+VirtAddr top_of(Array<u8, INTERRUPT_STACK_SIZE>& stack) {
+    return VirtAddr::from_ptr(stack.data() + stack.size());
+}
 
-TaskStateSegment g_boot_task_state;
-GlobalDescriptorTable g_boot_gdt;
-
-VirtAddr stack_top_of(u8* stack, u64 size) {
-    return VirtAddr::from_ptr(stack + size);
+void install_interrupt_stacks(TaskStateSegment& task_state, InterruptStackSet const& stacks) {
+    for (usize index = 0; index < INTERRUPT_STACK_COUNT; ++index)
+        task_state.interrupt_stacks[index] = stacks.tops[index].raw();
+    task_state.io_map_base = sizeof(TaskStateSegment);
 }
 
 }  // namespace
@@ -71,7 +74,6 @@ void GlobalDescriptorTable::initialize(TaskStateSegment& task_state) {
     low.base_low = static_cast<u16>(base & 0xffff);
     low.base_middle = static_cast<u8>((base >> 16) & 0xff);
     low.access = ACCESS_TSS_AVAILABLE | ACCESS_PRESENT;
-    low.flags_and_limit_high = 0;
     low.base_high = static_cast<u8>((base >> 24) & 0xff);
 
     SegmentDescriptor high {};
@@ -89,33 +91,42 @@ void GlobalDescriptorTable::load() const {
 
     __asm__ volatile("lgdt %0" ::"m"(pointer) : "memory");
 
-    barry_reload_segments(static_cast<u16>(Selector::KernelCode),
-                          static_cast<u16>(Selector::KernelData));
+    barry_reload_segments(to_underlying(Selector::KernelCode), to_underlying(Selector::KernelData));
 
-    __asm__ volatile("ltr %0" ::"r"(static_cast<u16>(Selector::TaskState)));
+    __asm__ volatile("ltr %0" ::"r"(to_underlying(Selector::TaskState)));
 }
 
-TaskStateSegment& boot_task_state_segment() {
-    return g_boot_task_state;
+TaskStateSegment& task_state_segment_of(u32 index) {
+    VERIFY(index < MAX_PROCESSORS);
+    return g_task_states[index];
 }
 
-void set_kernel_stack_for_current_cpu(VirtAddr stack_top) {
-    g_boot_task_state.privilege_stacks[0] = stack_top.raw();
+void set_kernel_stack_for_current_processor(u32 index, VirtAddr stack_top) {
+    task_state_segment_of(index).privilege_stacks[0] = stack_top.raw();
 }
 
-void initialize_descriptor_tables() {
-    auto& task_state = g_boot_task_state;
+KResult initialize_descriptor_tables_for_processor(u32 index, InterruptStackSet const& stacks) {
+    if (index >= MAX_PROCESSORS)
+        return Error(Errno::ERANGE, "processor index exceeds the supported maximum");
 
-    task_state.interrupt_stacks[to_underlying(InterruptStack::DoubleFault) - 1]
-        = stack_top_of(g_double_fault_stack, DOUBLE_FAULT_STACK_SIZE).raw();
-    task_state.interrupt_stacks[to_underlying(InterruptStack::NonMaskable) - 1]
-        = stack_top_of(g_non_maskable_stack, NON_MASKABLE_STACK_SIZE).raw();
-    task_state.interrupt_stacks[to_underlying(InterruptStack::Debug) - 1]
-        = stack_top_of(g_debug_stack, DEBUG_STACK_SIZE).raw();
-    task_state.io_map_base = sizeof(TaskStateSegment);
+    TaskStateSegment& task_state = g_task_states[index];
+    install_interrupt_stacks(task_state, stacks);
 
-    g_boot_gdt.initialize(task_state);
-    g_boot_gdt.load();
+    GlobalDescriptorTable& table = g_descriptor_tables[index];
+    table.initialize(task_state);
+    table.load();
+    return {};
+}
+
+KResult initialize_descriptor_tables_for_boot_processor() {
+    InterruptStackSet stacks {};
+    stacks.tops[to_underlying(InterruptStack::DoubleFault) - 1]
+        = top_of(g_boot_double_fault_stack);
+    stacks.tops[to_underlying(InterruptStack::NonMaskable) - 1]
+        = top_of(g_boot_non_maskable_stack);
+    stacks.tops[to_underlying(InterruptStack::Debug) - 1] = top_of(g_boot_debug_stack);
+
+    return initialize_descriptor_tables_for_processor(0, stacks);
 }
 
 }  // namespace barry::arch

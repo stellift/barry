@@ -18,4 +18,6 @@ KResult build_and_activate_kernel_address_space(boot::BootInfo const& boot_info)
 
 AddressSpace& kernel_address_space();
 
+KResultOr<VirtAddr> map_device_memory(PhysRange range);
+
 }  // namespace barry::mm

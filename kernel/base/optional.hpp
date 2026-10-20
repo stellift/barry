@@ -66,7 +66,15 @@ public:
         return *this;
     }
 
-    ~Optional() { clear(); }
+    ~Optional()
+        requires(is_trivially_destructible_v<T>)
+    = default;
+
+    ~Optional()
+        requires(!is_trivially_destructible_v<T>)
+    {
+        clear();
+    }
 
     bool has_value() const { return m_has_value; }
     explicit operator bool() const { return m_has_value; }

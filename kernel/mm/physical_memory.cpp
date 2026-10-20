@@ -116,6 +116,27 @@ KResultOr<u64> PhysicalMemoryManager::claim_run(State& state, u64 page_count) {
     return start;
 }
 
+KResultOr<u64> PhysicalMemoryManager::claim_frame_below(State& state, u64 frame_limit) {
+    u64 const highest = min(frame_limit, state.managed_page_count);
+
+    for (u64 frame = 1; frame < highest; ++frame) {
+        if (state.frames.get(frame))
+            continue;
+
+        state.frames.set(frame);
+        ++state.allocated_page_count;
+        return frame;
+    }
+
+    return Error(Errno::ENOMEM, "no free physical page below the requested limit");
+}
+
+KResultOr<PhysAddr> PhysicalMemoryManager::allocate_page_below(PhysAddr limit) {
+    auto guard = m_state.lock();
+    u64 const frame = TRY(claim_frame_below(*guard, limit.page_frame_number()));
+    return PhysAddr::from_page_frame_number(frame);
+}
+
 KResultOr<PhysAddr> PhysicalMemoryManager::allocate_page() {
     auto range = TRY(allocate_contiguous(1));
     return range.base;

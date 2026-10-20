@@ -17,3 +17,19 @@ void __stack_chk_fail() {
     PANIC("stack smashing detected");
 }
 }
+
+void operator delete(void*) noexcept {
+    PANIC("global delete is not available in the kernel; use OwnPtr or RefPtr");
+}
+
+void operator delete(void*, barry::usize) noexcept {
+    PANIC("global sized delete is not available in the kernel; use OwnPtr or RefPtr");
+}
+
+void operator delete[](void*) noexcept {
+    PANIC("global array delete is not available in the kernel");
+}
+
+void operator delete[](void*, barry::usize) noexcept {
+    PANIC("global sized array delete is not available in the kernel");
+}

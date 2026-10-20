@@ -41,6 +41,8 @@ struct TrapFrame {
 
 static_assert(sizeof(GeneralPurposeRegisters) == 15 * sizeof(u64));
 static_assert(sizeof(TrapFrame) == 22 * sizeof(u64));
+static_assert(__builtin_offsetof(TrapFrame, code_selector) == 144,
+              "the interrupt stubs test the privilege level at this offset");
 
 enum class Exception : u8 {
     DivideError = 0,
@@ -75,6 +77,8 @@ bool vector_is_exception(u8 vector);
 using InterruptHandler = void (*)(TrapFrame&);
 
 void initialize_interrupts();
+
+void load_interrupt_descriptor_table();
 
 bool register_interrupt_handler(u8 vector, InterruptHandler handler);
 void unregister_interrupt_handler(u8 vector);

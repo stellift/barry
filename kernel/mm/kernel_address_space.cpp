@@ -16,8 +16,6 @@ extern "C" char __kernel_writable_end[];
 namespace barry::mm {
 namespace {
 
-constexpr u64 CR4_PAGE_GLOBAL_ENABLE = 1ULL << 7;
-
 AddressSpace g_kernel_address_space;
 
 VirtRange range_between(char const* start, char const* end) {
@@ -45,7 +43,7 @@ bool region_is_system_memory(boot::MemoryKind kind) {
 
 void enable_paging_features() {
     arch::write_msr(arch::MSR_EFER, arch::read_msr(arch::MSR_EFER) | arch::EFER_NO_EXECUTE_ENABLE);
-    arch::write_cr4(arch::read_cr4() | CR4_PAGE_GLOBAL_ENABLE);
+    arch::write_cr4(arch::read_cr4() | arch::CR4_PAGE_GLOBAL_ENABLE);
 }
 
 KResult map_direct_window(AddressSpace& space, PhysRange range) {
@@ -139,6 +137,25 @@ KResult build_and_activate_kernel_address_space(boot::BootInfo const& boot_info)
 
 AddressSpace& kernel_address_space() {
     return g_kernel_address_space;
+}
+
+KResultOr<VirtAddr> map_device_memory(PhysRange range) {
+    if (range.length == 0)
+        return Error(Errno::EINVAL, "cannot map an empty device range");
+
+    PhysAddr const base = range.base.page_align_down();
+    PhysAddr const limit = range.end().page_align_up();
+    VirtAddr const window = direct_map_of(base);
+
+    for (u64 offset = 0; offset < base.distance_to(limit); offset += PAGE_SIZE) {
+        VirtAddr const virtual_address = window.offset(offset);
+        if (g_kernel_address_space.translate(virtual_address).has_value())
+            continue;
+        TRY(g_kernel_address_space.map_page(virtual_address, base.offset(offset),
+                                            DEVICE_MEMORY_FLAGS));
+    }
+
+    return direct_map_of(range.base);
 }
 
 }  // namespace barry::mm

@@ -11,7 +11,7 @@ namespace barry::sync {
 
 class SpinLock {
 public:
-    SpinLock() = default;
+    constexpr SpinLock() = default;
     SpinLock(SpinLock const&) = delete;
     SpinLock& operator=(SpinLock const&) = delete;
 
@@ -67,10 +67,10 @@ public:
         bool m_interrupts_were_enabled;
     };
 
-    Protected() = default;
+    constexpr Protected() = default;
 
     template<typename... Args>
-    explicit Protected(Args&&... args) : m_value(forward<Args>(args)...) {}
+    constexpr explicit Protected(Args&&... args) : m_value(forward<Args>(args)...) {}
 
     Protected(Protected const&) = delete;
     Protected& operator=(Protected const&) = delete;
@@ -86,8 +86,6 @@ public:
     bool is_locked() const { return m_lock.is_locked(); }
 
 private:
-    friend class Guard;
-
     T m_value {};
     SpinLock m_lock;
 };

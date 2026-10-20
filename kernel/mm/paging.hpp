@@ -42,6 +42,15 @@ inline constexpr PageFlags KERNEL_READONLY_FLAGS
     = PageFlags::Present | PageFlags::Global | PageFlags::NoExecute;
 inline constexpr PageFlags KERNEL_DATA_FLAGS
     = PageFlags::Present | PageFlags::Writable | PageFlags::Global | PageFlags::NoExecute;
+inline constexpr PageFlags USER_CODE_FLAGS
+    = PageFlags::Present | PageFlags::UserAccessible;
+inline constexpr PageFlags USER_READONLY_FLAGS
+    = PageFlags::Present | PageFlags::UserAccessible | PageFlags::NoExecute;
+inline constexpr PageFlags USER_DATA_FLAGS = PageFlags::Present | PageFlags::Writable
+                                             | PageFlags::UserAccessible
+                                             | PageFlags::NoExecute;
+inline constexpr PageFlags BOOT_TRAMPOLINE_FLAGS
+    = PageFlags::Present | PageFlags::Writable | PageFlags::Global;
 inline constexpr PageFlags DEVICE_MEMORY_FLAGS = PageFlags::Present | PageFlags::Writable
                                                  | PageFlags::NoExecute
                                                  | PageFlags::CacheDisabled;
@@ -69,6 +78,7 @@ private:
 static_assert(sizeof(PageTableEntry) == sizeof(u64));
 
 inline constexpr usize PAGE_TABLE_ENTRY_COUNT = 512;
+inline constexpr usize FIRST_KERNEL_TOP_LEVEL_INDEX = 256;
 
 struct PageTable {
     Array<PageTableEntry, PAGE_TABLE_ENTRY_COUNT> entries;
@@ -86,17 +96,27 @@ public:
     PhysAddr root() const { return m_root; }
     bool is_valid() const { return !m_root.is_null(); }
 
+    static KResultOr<AddressSpace> create_user_space(AddressSpace const& kernel_space);
+
+    void release_user_half();
+
+    KResult clone_user_half(AddressSpace& destination) const;
+
     KResult map_page(VirtAddr virtual_address, PhysAddr physical_address, PageFlags flags);
     KResult map_large_page(VirtAddr virtual_address, PhysAddr physical_address, PageFlags flags);
     KResult map_range(VirtRange range, PhysAddr physical_base, PageFlags flags);
     KResult unmap_page(VirtAddr virtual_address);
 
     Optional<PhysAddr> translate(VirtAddr virtual_address) const;
+    Optional<PageTableEntry> lookup(VirtAddr virtual_address) const;
+
+    KResult unmap_and_release_range(VirtRange range);
 
     void activate() const;
 
 private:
-    KResultOr<PageTable*> next_level(PageTableEntry& entry, bool create);
+    KResultOr<PageTable*> next_level(PageTableEntry& entry, PageFlags parent_flags);
+    KResultOr<PageTable*> existing_next_level(PageTableEntry const& entry) const;
     PageTable& table_at(PhysAddr address) const;
 
     PhysAddr m_root;

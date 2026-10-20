@@ -19,6 +19,8 @@ inline constexpr u64 EFER_NO_EXECUTE_ENABLE = 1ULL << 11;
 
 inline constexpr u64 RFLAGS_INTERRUPT_ENABLE = 1ULL << 9;
 
+inline constexpr u64 CR4_PAGE_GLOBAL_ENABLE = 1ULL << 7;
+
 inline void disable_interrupts() {
     __asm__ volatile("cli" ::: "memory");
 }

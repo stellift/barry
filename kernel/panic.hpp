@@ -3,16 +3,11 @@
 #include "kernel/base/fixed_string_buffer.hpp"
 #include "kernel/base/format.hpp"
 #include "kernel/base/optional.hpp"
+#include "kernel/base/source_location.hpp"
 #include "kernel/base/string_view.hpp"
 #include "kernel/base/types.hpp"
 
 namespace barry {
-
-struct SourceLocation {
-    StringView file;
-    StringView function;
-    u32 line { 0 };
-};
 
 struct ResolvedSymbol {
     StringView name;
@@ -36,11 +31,5 @@ template<typename... Args>
 }
 
 }  // namespace barry
-
-#define BARRY_SOURCE_LOCATION                                                          \
-    ::barry::SourceLocation {                                                          \
-        ::barry::StringView(__FILE__), ::barry::StringView(__PRETTY_FUNCTION__),       \
-            static_cast<::barry::u32>(__LINE__)                                        \
-    }
 
 #define PANIC(...) ::barry::panic_at(BARRY_SOURCE_LOCATION, __VA_ARGS__)

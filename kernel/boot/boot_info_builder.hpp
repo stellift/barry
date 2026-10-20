@@ -29,6 +29,8 @@ public:
     BootInfo const& finish();
 
 private:
+    void sort_memory_regions();
+
     BootInfo m_info {};
     Array<MemoryRegion, MAX_MEMORY_REGIONS> m_memory_regions { {} };
     Array<BootModule, MAX_BOOT_MODULES> m_modules { {} };

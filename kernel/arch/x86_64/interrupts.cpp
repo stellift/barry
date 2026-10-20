@@ -42,7 +42,7 @@ VirtAddr stub_address_for(u8 vector) {
     return VirtAddr::from_ptr(barry_isr_stub_table + vector * barry_isr_stub_stride);
 }
 
-void load_interrupt_descriptor_table() {
+void load_idt_register() {
     DescriptorTablePointer pointer {};
     pointer.limit = static_cast<u16>(sizeof(g_idt) - 1);
     pointer.base = reinterpret_cast<u64>(g_idt.data());
@@ -137,6 +137,10 @@ char const* exception_name(u8 vector) {
     }
 }
 
+void load_interrupt_descriptor_table() {
+    load_idt_register();
+}
+
 bool vector_is_exception(u8 vector) {
     return vector <= LAST_EXCEPTION_VECTOR;
 }
@@ -176,7 +180,7 @@ void initialize_interrupts() {
     set_interrupt_stack(to_underlying(Exception::NonMaskableInterrupt), InterruptStack::NonMaskable);
     set_interrupt_stack(to_underlying(Exception::Debug), InterruptStack::Debug);
 
-    load_interrupt_descriptor_table();
+    load_idt_register();
 }
 
 }  // namespace barry::arch

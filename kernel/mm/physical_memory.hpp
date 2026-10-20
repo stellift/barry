@@ -24,6 +24,7 @@ public:
 
     KResultOr<PhysAddr> allocate_page();
     KResultOr<PhysAddr> allocate_zeroed_page();
+    KResultOr<PhysAddr> allocate_page_below(PhysAddr limit);
     KResultOr<PhysRange> allocate_contiguous(u64 page_count);
 
     void free_page(PhysAddr address);
@@ -47,6 +48,7 @@ private:
     static void mark_usable_regions(State& state, boot::BootInfo const& boot_info);
 
     KResultOr<u64> claim_run(State& state, u64 page_count);
+    KResultOr<u64> claim_frame_below(State& state, u64 frame_limit);
 
     mutable sync::Protected<State> m_state;
     bool m_initialized { false };

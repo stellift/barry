@@ -1,6 +1,5 @@
-.set MULTIBOOT_HEADER_MAGIC, 0x1badb002
-.set MULTIBOOT_HEADER_FLAGS, 0x00000003
-.set MULTIBOOT_HEADER_CHECKSUM, -(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)
+.set MULTIBOOT2_HEADER_MAGIC, 0xe85250d6
+.set MULTIBOOT2_ARCHITECTURE_I386, 0
 
 .set PAGE_PRESENT, 0x001
 .set PAGE_WRITABLE, 0x002
@@ -14,25 +13,35 @@
 .set EFER_LONG_MODE, 0x00000100
 .set EFER_NO_EXECUTE, 0x00000800
 
-.set KERNEL_VIRTUAL_BASE_HIGH, 0xffffffff
 .set IDENTITY_GIGABYTES, 4
 .set KERNEL_MAPPED_LARGE_PAGES, 16
+.set DIRECT_MAP_TOP_LEVEL_INDEX, 256
+.set KERNEL_TOP_LEVEL_INDEX, 511
+.set KERNEL_DIRECTORY_POINTER_INDEX, 510
 
 .set SELECTOR_CODE64, 0x08
 .set SELECTOR_DATA64, 0x10
 
 .section .boot.header, "a"
-.align 4
-barry_multiboot_header:
-    .long MULTIBOOT_HEADER_MAGIC
-    .long MULTIBOOT_HEADER_FLAGS
-    .long MULTIBOOT_HEADER_CHECKSUM
+.align 8
+barry_multiboot2_header:
+    .long MULTIBOOT2_HEADER_MAGIC
+    .long MULTIBOOT2_ARCHITECTURE_I386
+    .long barry_multiboot2_header_end - barry_multiboot2_header
+    .long -(MULTIBOOT2_HEADER_MAGIC + MULTIBOOT2_ARCHITECTURE_I386 \
+            + (barry_multiboot2_header_end - barry_multiboot2_header))
+
+    .align 8
+    .short 0
+    .short 0
+    .long 8
+barry_multiboot2_header_end:
 
 .section .boot.text, "ax"
 .code32
-.global barry_multiboot_entry
-.type barry_multiboot_entry, @function
-barry_multiboot_entry:
+.global barry_multiboot2_entry
+.type barry_multiboot2_entry, @function
+barry_multiboot2_entry:
     cli
     cld
     movl $boot_stack_top, %esp
@@ -87,8 +96,8 @@ build_kernel_page_directory:
     movl $kernel_page_directory_pointers, %edi
     movl $kernel_page_directory, %eax
     orl $TABLE_FLAGS, %eax
-    movl %eax, 510 * 8(%edi)
-    movl $0, 510 * 8 + 4(%edi)
+    movl %eax, KERNEL_DIRECTORY_POINTER_INDEX * 8(%edi)
+    movl $0, KERNEL_DIRECTORY_POINTER_INDEX * 8 + 4(%edi)
     ret
 
 build_top_level_table:
@@ -97,13 +106,13 @@ build_top_level_table:
     orl $TABLE_FLAGS, %eax
     movl %eax, (%edi)
     movl $0, 4(%edi)
-    movl %eax, 256 * 8(%edi)
-    movl $0, 256 * 8 + 4(%edi)
+    movl %eax, DIRECT_MAP_TOP_LEVEL_INDEX * 8(%edi)
+    movl $0, DIRECT_MAP_TOP_LEVEL_INDEX * 8 + 4(%edi)
 
     movl $kernel_page_directory_pointers, %eax
     orl $TABLE_FLAGS, %eax
-    movl %eax, 511 * 8(%edi)
-    movl $0, 511 * 8 + 4(%edi)
+    movl %eax, KERNEL_TOP_LEVEL_INDEX * 8(%edi)
+    movl $0, KERNEL_TOP_LEVEL_INDEX * 8 + 4(%edi)
     ret
 
 enter_long_mode:
@@ -149,7 +158,7 @@ long_mode_landing:
 
     movl %r14d, %edi
     movl %r15d, %esi
-    movabsq $barry_multiboot_main, %rax
+    movabsq $barry_multiboot2_main, %rax
     callq *%rax
 
 .halt_forever:
@@ -157,7 +166,7 @@ long_mode_landing:
     hlt
     jmp .halt_forever
 
-.size barry_multiboot_entry, . - barry_multiboot_entry
+.size barry_multiboot2_entry, . - barry_multiboot2_entry
 
 .section .boot.data, "aw"
 .align 8

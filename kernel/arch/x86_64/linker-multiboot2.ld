@@ -1,5 +1,5 @@
 OUTPUT_FORMAT(elf64-x86-64)
-ENTRY(barry_multiboot_entry)
+ENTRY(barry_multiboot2_entry)
 
 KERNEL_VIRTUAL_BASE = 0xffffffff80000000;
 KERNEL_PHYSICAL_BASE = 0x200000;
@@ -45,6 +45,12 @@ SECTIONS
         *(.rodata .rodata.*)
     } :rodata
 
+    .init_array : AT(ADDR(.init_array) - KERNEL_VIRTUAL_BASE + KERNEL_PHYSICAL_BASE) {
+        KEEP(*(.init_array .init_array.*))
+        KEEP(*(.ctors))
+        KEEP(*(.preinit_array))
+    } :rodata
+
     .ktests : AT(ADDR(.ktests) - KERNEL_VIRTUAL_BASE + KERNEL_PHYSICAL_BASE) {
         __kernel_tests_start = .;
         KEEP(*(.ktests))
@@ -83,3 +89,6 @@ SECTIONS
         *(.dynamic)
     }
 }
+
+ASSERT(SIZEOF(.init_array) == 0,
+       "Barry forbids globals that need dynamic initialization; make them constant-initializable")

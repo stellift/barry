@@ -36,11 +36,15 @@ bool BootInfo::is_valid() const {
     if (processors.is_empty())
         return false;
 
+    PhysAddr previous_end {};
     for (auto const& region : memory_map) {
         if (region.length == 0)
             return false;
-        if (region.base.offset(region.length) < region.base)
+        if (region.end() < region.base)
             return false;
+        if (region.base < previous_end)
+            return false;
+        previous_end = region.end();
     }
     return true;
 }

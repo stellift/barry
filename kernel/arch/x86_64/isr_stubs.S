@@ -2,6 +2,8 @@
 
 .set VECTOR_COUNT, 256
 .set STUB_STRIDE, 16
+.set TRAP_FRAME_CODE_SELECTOR_OFFSET, 144
+.set USER_PRIVILEGE_MASK, 3
 
 .global barry_isr_stub_table
 .global barry_isr_stub_stride
@@ -40,9 +42,19 @@ barry_isr_common:
     pushq %r14
     pushq %r15
 
+    testb $USER_PRIVILEGE_MASK, TRAP_FRAME_CODE_SELECTOR_OFFSET(%rsp)
+    jz .Lkernel_entry
+    swapgs
+.Lkernel_entry:
+
     cld
     movq %rsp, %rdi
     call barry_dispatch_interrupt
+
+    testb $USER_PRIVILEGE_MASK, TRAP_FRAME_CODE_SELECTOR_OFFSET(%rsp)
+    jz .Lkernel_exit
+    swapgs
+.Lkernel_exit:
 
     popq %r15
     popq %r14

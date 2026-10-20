@@ -13,6 +13,7 @@ constexpr u8 FIFO_ENABLE_AND_CLEAR = 0xc7;
 constexpr u8 MODEM_DTR_RTS_OUT2 = 0x0b;
 constexpr u8 MODEM_LOOPBACK = 0x1e;
 constexpr u8 LINE_STATUS_TRANSMIT_EMPTY = 0x20;
+constexpr u8 LINE_STATUS_DATA_READY = 0x01;
 constexpr u8 LOOPBACK_PROBE_BYTE = 0xae;
 
 }  // namespace
@@ -27,6 +28,10 @@ void SerialPort::write_register(Register reg, u8 value) const {
 
 bool SerialPort::is_transmit_buffer_empty() const {
     return (read_register(Register::LineStatus) & LINE_STATUS_TRANSMIT_EMPTY) != 0;
+}
+
+bool SerialPort::has_received_byte() const {
+    return (read_register(Register::LineStatus) & LINE_STATUS_DATA_READY) != 0;
 }
 
 bool SerialPort::passes_loopback_test() const {
@@ -65,6 +70,12 @@ void SerialPort::write_byte(u8 byte) {
     while (!is_transmit_buffer_empty())
         arch::io_delay();
     write_register(Register::Data, byte);
+}
+
+Optional<u8> SerialPort::read_byte() {
+    if (!m_present || !has_received_byte())
+        return nullopt;
+    return read_register(Register::Data);
 }
 
 void SerialPort::write(StringView text) {

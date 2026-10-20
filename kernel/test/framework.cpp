@@ -2,6 +2,7 @@
 
 #include "kernel/base/span.hpp"
 #include "kernel/log.hpp"
+#include "kernel/panic.hpp"
 
 extern "C" barry::test::TestCase const __kernel_tests_start[];
 extern "C" barry::test::TestCase const __kernel_tests_end[];
@@ -21,6 +22,11 @@ Span<TestCase const> registered_tests() {
 void record_failure(StringView expression, SourceLocation location) {
     ++g_failures_in_current_test;
     dbgln("      FAIL {} at {}:{}", expression, location.file, location.line);
+}
+
+void abort_current_test(StringView expression, SourceLocation location) {
+    record_failure(expression, location);
+    PANIC("a required test precondition failed: {}", expression);
 }
 
 TestSummary run_all_tests() {

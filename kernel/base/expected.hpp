@@ -62,7 +62,15 @@ public:
         return *this;
     }
 
-    ~Expected() { destroy(); }
+    ~Expected()
+        requires(is_trivially_destructible_v<T> && is_trivially_destructible_v<E>)
+    = default;
+
+    ~Expected()
+        requires(!is_trivially_destructible_v<T> || !is_trivially_destructible_v<E>)
+    {
+        destroy();
+    }
 
     bool has_value() const { return m_has_value; }
     bool is_error() const { return !m_has_value; }
@@ -160,7 +168,13 @@ public:
         return *this;
     }
 
-    ~Expected() {
+    ~Expected()
+        requires(is_trivially_destructible_v<E>)
+    = default;
+
+    ~Expected()
+        requires(!is_trivially_destructible_v<E>)
+    {
         if (!m_has_value)
             m_error.destroy();
     }

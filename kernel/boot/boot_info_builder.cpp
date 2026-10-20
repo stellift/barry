@@ -31,7 +31,23 @@ bool BootInfoBuilder::add_processor(ProcessorDescriptor processor) {
     return true;
 }
 
+void BootInfoBuilder::sort_memory_regions() {
+    for (usize index = 1; index < m_memory_region_count; ++index) {
+        MemoryRegion const region = m_memory_regions[index];
+        usize position = index;
+
+        while (position > 0 && region.base < m_memory_regions[position - 1].base) {
+            m_memory_regions[position] = m_memory_regions[position - 1];
+            --position;
+        }
+
+        m_memory_regions[position] = region;
+    }
+}
+
 BootInfo const& BootInfoBuilder::finish() {
+    sort_memory_regions();
+
     m_info.memory_map = Span<MemoryRegion const>(m_memory_regions.data(), m_memory_region_count);
     m_info.modules = Span<BootModule const>(m_modules.data(), m_module_count);
     m_info.processors = Span<ProcessorDescriptor const>(m_processors.data(), m_processor_count);

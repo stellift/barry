@@ -2,16 +2,10 @@
 
 #include "kernel/base/string_view.hpp"
 #include "kernel/base/types.hpp"
-#include "kernel/panic.hpp"
+#include "kernel/base/source_location.hpp"
+#include "kernel/test/registration.hpp"
 
 namespace barry::test {
-
-using TestBody = void (*)();
-
-struct TestCase {
-    StringView name;
-    TestBody body;
-};
 
 struct TestSummary {
     usize total { 0 };
@@ -23,15 +17,11 @@ struct TestSummary {
 
 void record_failure(StringView expression, SourceLocation location);
 
+[[noreturn]] void abort_current_test(StringView expression, SourceLocation location);
+
 TestSummary run_all_tests();
 
 }  // namespace barry::test
-
-#define KERNEL_TEST(test_name)                                                              \
-    static void test_name();                                                                \
-    [[gnu::used, gnu::section(".ktests")]] static ::barry::test::TestCase const              \
-        test_name##_test_case { ::barry::StringView(#test_name), &test_name };               \
-    static void test_name()
 
 #define EXPECT(expression)                                                                  \
     do {                                                                                    \
@@ -54,6 +44,15 @@ TestSummary run_all_tests();
             ::barry::test::record_failure(::barry::StringView(#expression " succeeded"),     \
                                           BARRY_SOURCE_LOCATION);                            \
     } while (false)
+
+#define TRY_OR_FAIL(expression)                                                             \
+    ({                                                                                      \
+        auto&& _barry_required = (expression);                                              \
+        if (_barry_required.is_error()) [[unlikely]]                                        \
+            ::barry::test::abort_current_test(::barry::StringView(#expression),              \
+                                              BARRY_SOURCE_LOCATION);                        \
+        _barry_required.release_value();                                                    \
+    })
 
 #define EXPECT_ERROR(expression)                                                            \
     do {                                                                                    \

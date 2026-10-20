@@ -2,6 +2,7 @@
 
 #include "kernel/base/addr.hpp"
 #include "kernel/base/array.hpp"
+#include "kernel/base/expected.hpp"
 #include "kernel/base/types.hpp"
 
 namespace barry::arch {
@@ -22,6 +23,13 @@ enum class InterruptStack : u8 {
     Debug = 3,
 };
 
+inline constexpr usize INTERRUPT_STACK_COUNT = 3;
+inline constexpr u64 INTERRUPT_STACK_SIZE = 16_KiB;
+
+struct InterruptStackSet {
+    Array<VirtAddr, INTERRUPT_STACK_COUNT> tops { {} };
+};
+
 struct [[gnu::packed]] SegmentDescriptor {
     u16 limit_low { 0 };
     u16 base_low { 0 };
@@ -33,12 +41,6 @@ struct [[gnu::packed]] SegmentDescriptor {
     static constexpr SegmentDescriptor null() { return SegmentDescriptor {}; }
     static constexpr SegmentDescriptor code_segment(u8 privilege_level);
     static constexpr SegmentDescriptor data_segment(u8 privilege_level);
-};
-
-struct [[gnu::packed]] SystemSegmentDescriptor {
-    SegmentDescriptor low {};
-    u32 base_highest { 0 };
-    u32 reserved { 0 };
 };
 
 struct [[gnu::packed]] TaskStateSegment {
@@ -67,11 +69,13 @@ private:
     Array<SegmentDescriptor, ENTRY_COUNT> m_entries { {} };
 };
 
-void initialize_descriptor_tables();
+KResult initialize_descriptor_tables_for_boot_processor();
 
-TaskStateSegment& boot_task_state_segment();
+KResult initialize_descriptor_tables_for_processor(u32 index, InterruptStackSet const& stacks);
 
-void set_kernel_stack_for_current_cpu(VirtAddr stack_top);
+TaskStateSegment& task_state_segment_of(u32 index);
+
+void set_kernel_stack_for_current_processor(u32 index, VirtAddr stack_top);
 
 }  // namespace barry::arch
 
